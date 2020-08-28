@@ -1,111 +1,139 @@
 #pragma once
 
-#include "VulkanExampleBase.h"
+#pragma once
 
-class ScreenshotExample: public VulkanExampleBase
+#include <iostream>
+#include <chrono>
+#include <sys/stat.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <string>
+#include <numeric>
+#include <array>
+
+#include "vulkan/vulkan.h"
+
+#include "VulkanTools.hpp"
+
+#include "VulkanInitializers.hpp"
+#include "VulkanDevice.hpp"
+#include "VulkanSwapChain.hpp"
+
+class ScreenshotExample
 {
 public:
-    // Vertex layout used in this example
-    struct Vertex {
+    struct Vertex
+    {
         float position[3];
         float color[3];
     };
 
-    // Vertex buffer and attributes
-    struct {
+    struct
+    {
         VkDeviceMemory memory; // Handle to the device memory for this buffer
         VkBuffer buffer;       // Handle to the Vulkan buffer object that the memory is bound to
     } vertices;
 
-    // Index buffer
-    struct {
+    struct
+    {
         VkDeviceMemory memory;
         VkBuffer buffer;
         uint32_t count;
     } indices;
 
-    // Uniform buffer block object
-    struct {
+    struct
+    {
         VkDeviceMemory memory;
         VkBuffer buffer;
         VkDescriptorBufferInfo descriptor;
-    }  uniformBufferVS;
+    } uniformBufferVS;
 
-    // For simplicity we use the same uniform block layout as in the shader:
-    //
-    //	layout(set = 0, binding = 0) uniform UBO
-    //	{
-    //		mat4 projectionMatrix;
-    //		mat4 modelMatrix;
-    //		mat4 viewMatrix;
-    //	} ubo;
-    //
-    // This way we can just memcopy the ubo data to the ubo
-    // Note: You should use data types that align with the GPU in order to avoid manual padding (vec4, mat4)
-    struct {
+    struct
+    {
         glm::mat4 projectionMatrix;
         glm::mat4 modelMatrix;
         glm::mat4 viewMatrix;
     } uboVS;
 
-    // The pipeline layout is used by a pipline to access the descriptor sets
-    // It defines interface (without binding any actual data) between the shader stages used by the pipeline and the shader resources
-    // A pipeline layout can be shared among multiple pipelines as long as their interfaces match
     VkPipelineLayout pipelineLayout;
-
-    // Pipelines (often called "pipeline state objects") are used to bake all states that affect a pipeline
-    // While in OpenGL every state can be changed at (almost) any time, Vulkan requires to layout the graphics (and compute) pipeline states upfront
-    // So for each combination of non-dynamic pipeline states you need a new pipeline (there are a few exceptions to this not discussed here)
-    // Even though this adds a new dimension of planing ahead, it's a great opportunity for performance optimizations by the driver
     VkPipeline pipeline;
-
-    // The descriptor set layout describes the shader binding layout (without actually referencing descriptor)
-    // Like the pipeline layout it's pretty much a blueprint and can be used with different descriptor sets as long as their layout matches
     VkDescriptorSetLayout descriptorSetLayout;
-
-    // The descriptor set stores the resources bound to the binding points in a shader
-    // It connects the binding points of the different shaders with the buffers and images used for those bindings
     VkDescriptorSet descriptorSet;
-
-
-    // Synchronization primitives
-    // Synchronization is an important concept of Vulkan that OpenGL mostly hid away. Getting this right is crucial to using Vulkan.
-
-    // Semaphores
-    // Used to coordinate operations within the graphics queue and ensure correct command ordering
     VkSemaphore presentCompleteSemaphore;
     VkSemaphore renderCompleteSemaphore;
 
-    // Fences
-    // Used to check the completion of queue operations (e.g. command buffer execution)
-    std::vector<VkFence> waitFences;
-
-    bool screenshotSaved = false;
     bool doScreenshot = false;
 
     ScreenshotExample();
-    ~ScreenshotExample() override;
-    void render() override;
-    void viewChanged() override;
+    ~ScreenshotExample();
+    void render();
+    void keyPressed(uint32_t keycode);
+    void prepare();
+    bool initVulkan();
+    void * setupWindow(void * view);
+private:
+    bool prepared = false;
+    uint32_t width = 800;
+    uint32_t height = 600;
+
+    vks::VulkanDevice * vulkanDevice;
+
+    glm::mat4 viewMatrix;
+    glm::mat4 projectionMatrix;
+
+    std::string name = "screenshotExample";
+    uint32_t apiVersion = VK_API_VERSION_1_0;
+
+    void * view;
+    VkInstance instance;
+    VkPhysicalDevice physicalDevice;
+    VkPhysicalDeviceProperties deviceProperties;
+    VkPhysicalDeviceFeatures deviceFeatures;
+    VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
+    VkPhysicalDeviceFeatures enabledFeatures {};
+    std::vector<const char *> enabledDeviceExtensions;
+    std::vector<const char *> enabledInstanceExtensions;
+    void * deviceCreatepNextChain = nullptr;
+    VkDevice device;
+    VkQueue queue;
+    VkCommandPool cmdPool;
+    std::vector<VkCommandBuffer> drawCmdBuffers;
+    VkRenderPass renderPass;
+    std::vector<VkFramebuffer> frameBuffers;
+    uint32_t currentBuffer = 0;
+    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+    std::vector<VkShaderModule> shaderModules;
+    VulkanSwapChain swapChain;
+    std::vector<VkFence> waitFences;
+
+    bool viewUpdated = false;
+    void nextFrame();
+    void createCommandPool();
+    void createSynchronizationPrimitives();
+    void initSwapchain();
+    void setupSwapChain();
+    void createCommandBuffers();
+    void saveScreenshot(const char * filename);
+    static std::string getShadersPath() ;
+    void viewChanged();
     uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties);
     void prepareSynchronizationPrimitives();
     VkCommandBuffer getCommandBuffer(bool begin);
-    void flushCommandBuffer(VkCommandBuffer commandBuffer);
-    void buildCommandBuffers() override;
+    void buildCommandBuffers();
+    void destroyCommandBuffers();
     void draw();
     void prepareVertices(bool useStagingBuffers);
     void setupDescriptorPool();
     void setupDescriptorSetLayout();
     void setupDescriptorSet();
-    void setupDepthStencil() override;
-    void setupFrameBuffer() override;
-    void setupRenderPass() override;
+    void setupFrameBuffer();
+    void setupRenderPass();
     VkShaderModule loadSPIRVShader(std::string filename);
     void preparePipelines();
     void prepareUniformBuffers();
     void updateUniformBuffers();
-    void prepare() override;
-    void keyPressed(uint32_t uint_32) override;
-private:
-    void saveScreenshot(const char * filename);
+    VkResult createInstance(bool enableValidation);
 };

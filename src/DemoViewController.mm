@@ -8,7 +8,7 @@
 #import "DemoViewController.h"
 #import <QuartzCore/CAMetalLayer.h>
 
-#include "MVKExample.h"
+#include "ScreenshotExample.hpp"
 
 
 const std::string getAssetPath() {
@@ -26,7 +26,7 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
                                     CVOptionFlags flagsIn,
                                     CVOptionFlags* flagsOut,
                                     void* target) {
-    ((MVKExample*)target)->renderFrame();
+    ((ScreenshotExample*)target)->render();
     return kCVReturnSuccess;
 }
 
@@ -35,7 +35,7 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
 #pragma mark DemoViewController
 
 @implementation DemoViewController {
-    MVKExample* _mvkExample;
+    ScreenshotExample * _screenshotExample;
     CVDisplayLinkRef _displayLink;
 }
 
@@ -45,22 +45,25 @@ static CVReturn DisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 	self.view.wantsLayer = YES;		// Back the view with a layer created by the makeBackingLayer method.
 
-    _mvkExample = new MVKExample((__bridge void *)self.view);
+    _screenshotExample = new ScreenshotExample();
+    _screenshotExample->initVulkan();
+    _screenshotExample->setupWindow((__bridge void *) self.view);
+    _screenshotExample->prepare();
 
     CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
-    CVDisplayLinkSetOutputCallback(_displayLink, &DisplayLinkCallback, _mvkExample);
+    CVDisplayLinkSetOutputCallback(_displayLink, &DisplayLinkCallback, _screenshotExample);
     CVDisplayLinkStart(_displayLink);
 }
 
 -(void) dealloc {
     CVDisplayLinkRelease(_displayLink);
-    delete _mvkExample;
+    delete _screenshotExample;
 //    [super dealloc];
 }
 
 // Handle keyboard input
 -(void) keyDown:(NSEvent*) theEvent {
-    _mvkExample->keyPressed(theEvent.keyCode);
+    _screenshotExample->keyPressed(theEvent.keyCode);
 }
 
 @end
