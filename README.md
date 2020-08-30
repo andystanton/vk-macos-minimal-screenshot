@@ -1,8 +1,8 @@
 # Minimal Screenshot Example with Vulkan on macOS
 
-This repository uses the code from [Sascha Willems' Vulkan Examples](https://github.com/SaschaWillems/Vulkan) to draw a triangle and provide screenshot functionality. The code has been reduced to as minimal an example as possible.
+The purpose of this project is to demonstrate a possible regression that was introduced between `vulkansdk-macos-1.2.141.2` and `vulkansdk-macos-1.2.148.0` where a screenshot taken using `vkCmdCopyImage` will result in an image of only black pixels. 
 
-The purpose is to highlight a regression that was introduced between `vulkansdk-macos-1.2.141.2` and `vulkansdk-macos-1.2.148.0` where a screenshot taken using `vkCmdCopyImage` will result in an image of only black pixels. 
+This repository uses the code from [Sascha Willems' Vulkan Examples](https://github.com/SaschaWillems/Vulkan) to draw a triangle and provide screenshot functionality. The code has been reduced to provide a minimally reproducible example.
 
 ## Usage
 
