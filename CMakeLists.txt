@@ -14,6 +14,18 @@ set(MACOSX_BUNDLE_BUNDLE_NAME ${PROJECT_NAME})
 set(MACOSX_BUNDLE_PRINCIPAL_CLASS NSApplication)
 set(MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/macos/MacOSXBundleInfo.plist.in")
 
+# Create imgui lib
+
+add_library(
+    imgui
+        external/imgui/imgui.cpp
+        external/imgui/imgui_draw.cpp
+        external/imgui/imgui_demo.cpp
+        external/imgui/examples/imgui_impl_vulkan.cpp)
+
+target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
+target_include_directories(imgui PRIVATE ${Vulkan_INCLUDE_DIRS})
+
 # Add executable
 
 add_executable(
@@ -42,6 +54,7 @@ target_include_directories(screenshot PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(
     screenshot
     glm
+    imgui
     ${Vulkan_LIBRARIES}
     "-framework Cocoa"
     "-framework QuartzCore")
