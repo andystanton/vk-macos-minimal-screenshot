@@ -21,10 +21,23 @@ add_library(
         external/imgui/imgui.cpp
         external/imgui/imgui_draw.cpp
         external/imgui/imgui_demo.cpp
-        external/imgui/examples/imgui_impl_vulkan.cpp)
+        external/imgui/imgui_widgets.cpp
+        external/imgui/examples/imgui_impl_vulkan.cpp
+        external/imgui/examples/imgui_impl_osx.mm)
 
 target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
 target_include_directories(imgui PRIVATE ${Vulkan_INCLUDE_DIRS})
+
+set_source_files_properties(
+    external/imgui/examples/imgui_impl_osx.mm
+    PROPERTIES
+        COMPILE_FLAGS "-fobjc-arc")
+
+set_target_properties(
+    imgui
+    PROPERTIES
+        LINKER_LANGUAGE CXX
+        CXX_STANDARD 17)
 
 # Add executable
 
@@ -49,7 +62,7 @@ set_target_properties(
         CXX_STANDARD 17)
 
 target_compile_definitions(screenshot PRIVATE VK_USE_PLATFORM_MACOS_MVK)
-target_include_directories(screenshot PRIVATE ${Vulkan_INCLUDE_DIRS})
+target_include_directories(screenshot PRIVATE ${Vulkan_INCLUDE_DIRS} external/imgui/examples)
 
 target_link_libraries(
     screenshot

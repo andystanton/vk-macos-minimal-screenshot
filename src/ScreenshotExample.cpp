@@ -23,6 +23,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vulkan/vulkan.h>
+#include "examples/imgui_impl_vulkan.h"
 #include "ScreenshotExample.hpp"
 
 ScreenshotExample::ScreenshotExample()
@@ -39,6 +40,8 @@ ScreenshotExample::ScreenshotExample()
 
 ScreenshotExample::~ScreenshotExample()
 {
+    ImGui_ImplVulkan_Shutdown();
+
     vkDestroyPipeline(device, pipeline, nullptr);
 
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -133,7 +136,14 @@ VkCommandBuffer ScreenshotExample::getCommandBuffer(bool begin)
     return cmdBuffer;
 }
 
-void ScreenshotExample::buildCommandBuffers()
+void ScreenshotExample::completeRenderPassAndCommandBuffer(uint32_t i)
+{
+    vkCmdEndRenderPass(drawCmdBuffers[i]);
+
+    VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
+}
+
+void ScreenshotExample::beginRenderPassAndCommandBuffer(uint32_t i)
 {
     VkCommandBufferBeginInfo cmdBufInfo = {};
     cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -153,47 +163,54 @@ void ScreenshotExample::buildCommandBuffers()
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = clearValues;
 
-    for (int32_t i = 0; i < drawCmdBuffers.size(); ++i) {
-        renderPassBeginInfo.framebuffer = frameBuffers[i];
+    renderPassBeginInfo.framebuffer = frameBuffers[i];
 
-        VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
+    VK_CHECK_RESULT(vkBeginCommandBuffer(drawCmdBuffers[i], &cmdBufInfo));
 
-        vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(drawCmdBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        VkViewport viewport = {};
-        viewport.height = (float) height;
-        viewport.width = (float) width;
-        viewport.minDepth = (float) 0.0f;
-        viewport.maxDepth = (float) 1.0f;
-        vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
+    VkViewport viewport = {};
+    viewport.height = (float) height;
+    viewport.width = (float) width;
+    viewport.minDepth = (float) 0.0f;
+    viewport.maxDepth = (float) 1.0f;
+    vkCmdSetViewport(drawCmdBuffers[i], 0, 1, &viewport);
 
-        VkRect2D scissor = {};
-        scissor.extent.width = width;
-        scissor.extent.height = height;
-        scissor.offset.x = 0;
-        scissor.offset.y = 0;
-        vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
+    VkRect2D scissor = {};
+    scissor.extent.width = width;
+    scissor.extent.height = height;
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    vkCmdSetScissor(drawCmdBuffers[i], 0, 1, &scissor);
 
-        vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
-        vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdBindPipeline(drawCmdBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        VkDeviceSize offsets[1] = { 0 };
-        vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertices.buffer, offsets);
-        vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.buffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(drawCmdBuffers[i], indices.count, 1, 0, 0, 1);
-        vkCmdEndRenderPass(drawCmdBuffers[i]);
+    VkDeviceSize offsets[1] = { 0 };
+    vkCmdBindVertexBuffers(drawCmdBuffers[i], 0, 1, &vertices.buffer, offsets);
+    vkCmdBindIndexBuffer(drawCmdBuffers[i], indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(drawCmdBuffers[i], indices.count, 1, 0, 0, 1);
 
-        VK_CHECK_RESULT(vkEndCommandBuffer(drawCmdBuffers[i]));
-    }
 }
 
-void ScreenshotExample::draw()
+void ScreenshotExample::preDraw()
 {
     VK_CHECK_RESULT(swapChain.acquireNextImage(presentCompleteSemaphore, &currentBuffer));
 
     VK_CHECK_RESULT(vkWaitForFences(device, 1, &waitFences[currentBuffer], VK_TRUE, UINT64_MAX));
     VK_CHECK_RESULT(vkResetFences(device, 1, &waitFences[currentBuffer]));
+}
+
+void ScreenshotExample::draw()
+{
+    ImGui_ImplVulkan_NewFrame();
+    ImGui::NewFrame();
+    ImGui::ShowDemoWindow(&windowOpen);
+    ImGui::Render();
+    beginRenderPassAndCommandBuffer(currentBuffer);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), drawCmdBuffers[currentBuffer]);
+    completeRenderPassAndCommandBuffer(currentBuffer);
 
     VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submitInfo = {};
@@ -366,9 +383,9 @@ void ScreenshotExample::setupDescriptorPool()
     VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolInfo.pNext = nullptr;
-    descriptorPoolInfo.poolSizeCount = 1;
+    descriptorPoolInfo.poolSizeCount = 2;
     descriptorPoolInfo.pPoolSizes = typeCounts;
-    descriptorPoolInfo.maxSets = 1;
+    descriptorPoolInfo.maxSets = 2;
 
     VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
 }
@@ -691,21 +708,35 @@ void ScreenshotExample::prepare()
     preparePipelines();
     setupDescriptorPool();
     setupDescriptorSet();
-    buildCommandBuffers();
-    prepared = true;
+
+    imguiContext = ImGui::CreateContext(nullptr);
+    imgui_vulkan_info = {};
+    imgui_vulkan_info.Instance = instance;
+    imgui_vulkan_info.PhysicalDevice = physicalDevice;
+    imgui_vulkan_info.Device = device;
+    imgui_vulkan_info.Queue = queue;
+    imgui_vulkan_info.QueueFamily = vulkanDevice->queueFamilyIndices.graphics;
+    imgui_vulkan_info.DescriptorPool = descriptorPool;
+    imgui_vulkan_info.PipelineCache = VK_NULL_HANDLE;
+    imgui_vulkan_info.MinImageCount = swapChain.imageCount;
+    imgui_vulkan_info.ImageCount = swapChain.imageCount;
 }
 
-void ScreenshotExample::render()
+void ScreenshotExample::postPrepare()
 {
-    if (!prepared) {
-        return;
+    ImGui_ImplVulkan_Init(&imgui_vulkan_info, renderPass);
+    VkCommandBuffer command_buffer = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+
+    bool fonts_created = ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+    if (!fonts_created) {
+        printf("fonts failed to initialise\n");
+    } else {
+        printf("fonts successfully initialised\n");
     }
-    draw();
-}
 
-void ScreenshotExample::viewChanged()
-{
-    updateUniformBuffers();
+    vulkanDevice->flushCommandBuffer(command_buffer, queue, true);
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
+    prepared = true;
 }
 
 void ScreenshotExample::keyPressed(uint32_t keycode)
@@ -972,16 +1003,6 @@ void ScreenshotExample::setupSwapChain()
     swapChain.create(&width, &height, false);
 }
 
-void ScreenshotExample::nextFrame()
-{
-    if (viewUpdated) {
-        viewUpdated = false;
-        viewChanged();
-    }
-
-    render();
-}
-
 VkResult ScreenshotExample::createInstance(bool enableValidation)
 {
     VkApplicationInfo appInfo = {};
@@ -1097,4 +1118,9 @@ void * ScreenshotExample::setupWindow(void * view)
 std::string ScreenshotExample::getShadersPath()
 {
     return getAssetPath() + "shaders/glsl/";
+}
+
+void * ScreenshotExample::getView()
+{
+    return view;
 }

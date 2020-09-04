@@ -17,6 +17,8 @@
 #include "vulkan/vulkan.h"
 
 #include "VulkanTools.hpp"
+#include "imgui.h"
+#include "imgui_impl_vulkan.h"
 
 #include "VulkanInitializers.hpp"
 #include "VulkanDevice.hpp"
@@ -69,11 +71,14 @@ public:
 
     ScreenshotExample();
     ~ScreenshotExample();
-    void render();
+    void draw();
+    void preDraw();
     void keyPressed(uint32_t keycode);
     void prepare();
+    void postPrepare();
     bool initVulkan();
     void * setupWindow(void * view);
+    void * getView();
 private:
     bool prepared = false;
     uint32_t width = 800;
@@ -109,22 +114,21 @@ private:
     VulkanSwapChain swapChain;
     std::vector<VkFence> waitFences;
 
-    bool viewUpdated = false;
-    void nextFrame();
+    ImGuiContext * imguiContext;
+    ImGui_ImplVulkan_InitInfo imgui_vulkan_info;
+    bool windowOpen;
+
     void createCommandPool();
     void createSynchronizationPrimitives();
     void initSwapchain();
     void setupSwapChain();
     void createCommandBuffers();
     void saveScreenshot(const char * filename);
-    static std::string getShadersPath() ;
-    void viewChanged();
+    static std::string getShadersPath();
     uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties);
     void prepareSynchronizationPrimitives();
     VkCommandBuffer getCommandBuffer(bool begin);
-    void buildCommandBuffers();
     void destroyCommandBuffers();
-    void draw();
     void prepareVertices(bool useStagingBuffers);
     void setupDescriptorPool();
     void setupDescriptorSetLayout();
@@ -136,4 +140,6 @@ private:
     void prepareUniformBuffers();
     void updateUniformBuffers();
     VkResult createInstance(bool enableValidation);
+    void beginRenderPassAndCommandBuffer(uint32_t i);
+    void completeRenderPassAndCommandBuffer(uint32_t i);
 };
